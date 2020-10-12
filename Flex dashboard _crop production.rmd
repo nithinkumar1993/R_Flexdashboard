@@ -1,0 +1,429 @@
+---
+title: "India Crops"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: united
+    logo: logo.jpg
+    orientation: rows
+    vertical_layout: scroll
+    social: [ "twitter", "facebook", "menu"]
+    source_code: embed
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(highcharter)
+library(stringr)
+library(RColorBrewer)
+library(cowplot)
+library(RCurl)
+library(forcats)
+library(viridis)
+library(geojsonio)
+library(reshape2)
+```
+
+
+```{r}
+data <- read.csv("crop_production.csv",header=TRUE,stringsAsFactors = FALSE)
+
+```
+
+```{r}
+data$Production <- round(data$Production/100,2)
+data$Crop <- str_trim(data$Crop)
+data$Season <- str_trim(data$Season)
+```
+
+
+```{r}
+data$State_Name[data$State_Name == 'Andaman and Nicobar Islands']="Andaman and Nicobar"
+data$State_Name[data$State_Name == 'Odisha']="Orissa"
+data$State_Name[data$State_Name == 'Telangana']="Andhra Pradesh"  
+data$State_Name[data$State_Name == 'Uttarakhand']="Uttaranchal"
+```
+
+
+```{r}
+
+xx <- data%>%
+  #filter(Crop == 'Coconut')%>%
+  filter(!is.na(Production) & Crop != 'Coconut')%>%
+  select(State_Name,Production)%>%
+  group_by(State_Name)%>%
+  summarise(total=sum(Production))
+  
+```
+
+```{r}
+xx_r <- xx %>%
+  mutate(label_text = str_glue("State:{State_Name} \n Quantity: {total} Quintal"))
+```
+
+
+<i class="fas fa-database"></i> Dataset
+=============================================
+
+ 
+
+Row
+-------------------------------------------
+
+### **Introduction:**
+
+Agriculture is vital to any country, 60% of population works in the agriculture sector. In india comsumtion of Rice and Wheat is greater than the grops that are grown. Also main export is also Rice. This crops are also dependent on seasons. Each state has its own crop like kerala produces more coconuts. We are focusing more on Rice and Wheat as it is staple food in India.
+
+**The aim of this project is to analyse the Crop production in Indian states and mainly rice and wheat production.**
+
+ 
+### **Dataset Description:**
+
+ 
+Columns                         | Description        
+--------------------------------|------------------------------------  
+State_Name                      | Name of thee state
+District_Name                   | Name of the district
+Crop_Year                       | Harvested year of the crop
+Season                          | Season in which crop is harvested
+Crop                            | Name of the crop
+Area                            | Land area available for farming 
+Production                      | Amount of crop produced
+
+ 
+Row
+----------------------------------------
+
+### **Dataset Details:**
+
+* Dataset contains **246091 observations** and **7 columns**.
+
+* India has total **33 States** and **646 Districts**.
+
+* Total **126** different crops produced in **6 seasons**.
+
+* Data is collected from **year 1997 till 2015**.
+
+
+
+Row
+----------------------------------------
+
+### **Submited by:**
+
+
+**Name:** Nithin Kumar Nukala   
+**College ID:** C00246450
+
+
+<i class="far fa-chart-bar"></i> Visualization
+=====================================
+
+Row
+-------------------------------------
+
+### Total production in Quintal
+
+```{r}
+valueBox(sum(data$Production, na.rm = T),
+         icon = "glyphicon-leaf")
+```
+
+### Total States
+
+```{r}
+valueBox(length(unique(data$State_Name)),
+         icon = "fa-building",
+         color = "#58F8C6")
+```
+
+### Total Districts
+
+```{r}
+valueBox(length(unique(data$District_Name)),
+         icon = "glyphicon-home",
+         color = "#ECD036")
+```
+
+Column
+-----------------------------------------------------------------------
+
+### Crop Production till 2015 {data-commentary-width=400}
+
+```{r}
+plot1 <- ggplot(xx_r,aes(reorder(State_Name,total),total,fill = State_Name))+
+  geom_col(aes(text = label_text))+ coord_flip()+
+  scale_y_continuous(labels = scales::number_format())+
+  labs(y = "Crop production in Quintal",x = "States", title = "")+
+  theme(
+    legend.position="none",
+    panel.background = element_rect(fill = "white", colour = "turquoise3",size = 1.5, linetype = "solid"),
+    panel.grid.minor = element_line(size = .5, linetype = "blank" ),
+    panel.grid.major = element_line(size = .5, linetype = 'dotted',colour = "black"),
+    plot.title = element_text(face = "bold",colour = "mediumpurple4",size = 17)
+  )
+
+ggplotly(plot1,tooltip = "text")
+```
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### Season-wise Rice Production
+
+```{r}
+a <- data%>%
+  filter(Crop == 'Rice')%>%
+  select(Season,Crop,Production)
+ 
+ggplotly(ggplot(a,aes(x=Season, y = Production))+geom_boxplot(aes(fill = Season))+
+  theme(
+    legend.position="none",
+    panel.background = element_rect(fill = "white", colour = "turquoise3",size = 1.5, linetype = "solid"),
+    panel.grid.minor = element_line(size = .5, linetype = "blank" ),
+    panel.grid.major = element_line(size = .5, linetype = 'dotted',colour = "black"),
+    plot.title = element_text(face = "bold",colour = "mediumpurple4",size = 17)
+  ))
+
+
+```
+
+
+### Area VS Production
+
+
+```{r}
+xc <- data%>%
+  filter(!is.na(Production) & State_Name != 'Kerala')%>%
+  select(State_Name,Area,Production)%>%
+  group_by(State_Name)%>%
+  summarise(area = round(mean(Area),2),
+            production = round(mean(Production),2))
+
+melted <- melt(xc, id.var='State_Name', variable.name='type',
+        value.name='value')
+```
+
+```{r}
+Plot5 <- ggplot(melted,aes(x = State_Name, y = value)) + geom_col(aes(fill=type),position = 'dodge')+
+  theme(axis.text.x = element_text(color="steel blue", angle=90),plot.title = element_text(face = "bold",colour = "#9E0142",size = 18))+ scale_y_continuous(labels = scales::number_format())+scale_fill_viridis(discrete=TRUE, guide=FALSE, option="D")+
+  theme(
+    axis.text.x=element_text(angle=45),legend.position="top",
+    panel.background = element_rect(fill = "white", colour = "turquoise3",size = 1.5, linetype = "solid"),
+    panel.grid.minor = element_line(size = .5, linetype = "dotted" ,colour = "black"),
+    panel.grid.major = element_line(size = .5, linetype = 'dotted',colour = "black"),
+    plot.title = element_text(face = "bold",colour = "mediumpurple4",size = 20)
+  )+
+  labs(
+    x = "",
+    y = "Value",
+    title = ""
+  )
+
+ggplotly(Plot5)
+```
+
+
+Column 
+-----------------------------------------------------------------------
+
+### Top States Producing Rice
+
+```{r}
+col <- brewer.pal(n = 10, name = 'Spectral')
+```
+
+
+```{r}
+Plot2 <- data %>%
+  filter(!is.na(Production) & Crop == 'Rice')%>%
+         group_by(State_Name) %>%
+         summarise(rice = sum(Production)) %>%
+         filter(rice>660000) %>%
+         plot_ly(labels = ~State_Name,
+                 values = ~rice,
+                 marker = list(colors = col)
+                 ) %>%
+         add_pie(hole = 0.2) %>%
+         layout(xaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels = F,
+                             showgrid = F),
+                yaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels=F,
+                             showgrid=F))
+Plot2
+```
+
+
+### Top States producing Wheat
+
+```{r}
+Plot3 <- data %>%
+  filter(!is.na(Production) & Crop == 'Wheat')%>%
+         group_by(State_Name) %>%
+         summarise(rice = sum(Production)) %>%
+         filter(rice>117000) %>%
+         plot_ly(labels = ~State_Name,
+                 values = ~rice,
+                 marker = list(colors = col)
+                 ) %>%
+         add_pie(hole = 0.2) %>%
+         layout(xaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels = F,
+                             showgrid = F),
+                yaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels=F,
+                             showgrid=F))
+Plot3
+```
+
+
+
+<i class="fas fa-globe-asia"></i> Map
+========================================
+
+row {data-height=850}
+-------
+### State-wise production in India 
+
+
+```{r}
+IndGeoMap <- geojson_read( 'https://code.highcharts.com/mapdata/countries/in/custom/in-all-andaman-and-nicobar.geo.json')
+```
+
+
+```{r}
+sname <- data %>%
+         #filter(State_Name != 'Kerala')%>%
+         group_by(State_Name) %>%
+         summarize(fullcrop = round(sum(Production,na.rm = T),2))
+
+highchart() %>%
+         hc_title(text = "Crop production in india") %>%
+         hc_subtitle(text = "state wise production in Quintal") %>%
+         hc_add_series_map(IndGeoMap, sname,
+                           name = "State_Name",
+                           value = "fullcrop",
+                           joinBy = c("woe.name", "State_Name")) %>%
+         hc_mapNavigation(enabled = T)
+```
+
+
+<i class="fas fa-pencil-ruler"></i> Interactive
+========================================
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+fil_crop <- data%>%
+  filter(!is.na(Production) )%>%
+  group_by(Crop)%>%
+  summarise(prod = sum(Production))%>%
+  arrange(desc(prod))%>%
+  head(12)%>%
+  select(Crop)
+```
+
+```{r}
+checkboxGroupInput(inputId = "Crop_in",
+                   label = "Choose the Crop",
+                   choices = c(fil_crop[[1]]),
+                   selected = c("Rice","Sugarcane"))
+```
+
+
+```{r}
+
+sliderInput(inputId = "slider_input",
+            label = "Year",
+            min = min(data$Crop_Year),
+            max = max(data$Crop_Year),
+            value = c(2002,2008),
+            step = 1)
+```
+
+```{r}
+radioButtons(inputId = "radio_input", 
+             label = "Choose season", 
+             choices = unique(data$Season), 
+             selected = "Kharif")
+```
+
+ 
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Year-wise production of Crops
+
+
+```{r}
+crop_selected <- reactive({
+  data %>%
+    filter(Crop %in% input$Crop_in) %>%
+    filter(Crop_Year %>% between(left = input$slider_input[1],right = input$slider_input[2]))%>%
+    filter(Season == input$radio_input)
+})
+```
+
+```{r}
+renderPlotly({
+  crop_line <- crop_selected() %>%
+    group_by(Crop_Year,Crop) %>%
+    summarise(totPro = sum(Production, na.rm = T)) %>%
+    ggplot(aes(Crop_Year,totPro))+
+    geom_line(aes(color = Crop ))+scale_y_continuous(labels = scales::number_format())+
+    geom_point(shape=18,  size=2, color = "red")+
+    theme(
+    legend.position="top",
+    panel.background = element_rect(fill = "white", colour = "turquoise3",size = 1.5, linetype = "solid"),
+    panel.grid.minor = element_line(size = .5, linetype = "dotted" ,colour = "black"),
+    panel.grid.major = element_line(size = .5, linetype = 'dotted',colour = "black"),
+    plot.title = element_text(face = "bold",colour = "mediumpurple4",size = 20)
+  )+
+  labs(
+    x = "Year",
+    y = "Total Production",
+    title = ""
+  )
+  
+  ggplotly(crop_line)
+})
+```
+
+
+<i class="fas fa-clipboard-list"></i> Insights
+=========================================
+
+```{r}
+
+data11 <- data%>%
+  select(Crop_Year,Production)%>%
+  group_by(Crop_Year)%>%
+  summarise(Production = round(sum(Production, na.rm = T),2))
+
+mm <- round(mean(data11$Production),2)
+```
+
+**Conclusion:**
+
+* Average crop produced over the years is **74303219**.
+
+* Crops are produced more from **Uttar Pradesh** state.
+
+* **Rice** is harvested through out the year but is produced more in **Kharif season**.
+
+* **Andaman and Nicobar** produces more crop utilizing less area, where as **Punjab** produces very less crop having more area.
+
+* **West Bengal** state tops in **Rice** production where as **Uttar Pradesh** tops in **Wheat** production.
+
+
+This report was generated on `r format(Sys.Date(), format = "%B %d, %Y")`.
